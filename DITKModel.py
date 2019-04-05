@@ -42,19 +42,13 @@ class DITKModel_NER(abc.ABC):
                 filename [possibly with filepath]
 
         Returns:
-            data: data in proper [arbitrary] format for train or test.
-                OPEN ITEM: enforce specific format or keep as arbitrary? Currently arbitrary. IF format
-                    enforced, suggest simple List of Lists with:
-                        - outer list: data instances [i.e. a single data point/sample/example/instance, whatever you want to call it]
-                        - inner list: data within single data instance. for example, could be [(single sentence,label)]. or [(word1,POStag,label),(word2,POStag,label),...]
-                    --> even more general would just be: iterable [and then put whatever nested structures you want in there...]
-                ^^ CAN TEAM DISCUSS AND DECIDE if arbitrary format is OK or if we should move to common format???
+            data: data in arbitrary format for train or test.
 
         Raises:
             None
         """
         # IMPLEMENT READING
-        pass
+        # pass
 
     @abc.abstractmethod
     def train(self, data, *args, **kwargs):  # <--- implemented PER class
@@ -62,8 +56,7 @@ class DITKModel_NER(abc.ABC):
         Trains a model on the given input data
 
         Args:
-            data_X: iterable of arbitrary format. represents the data instances and features and labels you use to train your model.
-                Note: formal subject to OPEN ITEM mentioned in read_dataset!
+            data: iterable of arbitrary format. represents the data instances and features and labels you use to train your model.
 
         Returns:
             ret: None. Trained model stored internally to class instance state.
@@ -72,7 +65,7 @@ class DITKModel_NER(abc.ABC):
             None
         """
         # IMPLEMENT TRAINING.
-        pass
+        # pass
 
     @abc.abstractmethod
     def predict(self, data, *args, **kwargs):  # <--- implemented PER class WITH requirement on OUTPUT format!
@@ -83,7 +76,6 @@ class DITKModel_NER(abc.ABC):
             data: iterable of arbitrary format. represents the data instances and features you use to make predictions
                 Note that prediction requires trained model. Precondition that class instance already stores trained model
                 information.
-                Note: formal subject to OPEN ITEM mentioned in read_dataset!
 
 
         Returns:
