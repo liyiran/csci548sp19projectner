@@ -6,7 +6,7 @@
 
 ## Benchmarks
 - CoNLL 2003
-- OntoNotes
+- OntoNotes 5.0
 - CHEMDNER
 
 Try to run model on all 3 datasets. If the dataset does not fit the format of your model, you will have to preprocess it so it does (Sentence vs Paragraph in CoNLL). If you are unable to run on a dataset, provide an explaination why so.  
