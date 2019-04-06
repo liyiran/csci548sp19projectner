@@ -1,7 +1,7 @@
 import abc
 
 
-class DITKModel_NER(abc.ABC):
+class NER(abc.ABC):
 
     @abc.abstractmethod
     def convert_ground_truth(self, data, *args, **kwargs):  # <--- implemented PER class
