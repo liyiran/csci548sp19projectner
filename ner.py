@@ -33,13 +33,21 @@ class NER(abc.ABC):
         # return ground_truth
 
     @abc.abstractmethod
-    def read_dataset(self, fileNames, *args, **kwargs):  # <--- implemented PER class
+    def read_dataset(self, file_dict, dataset_name, *args, **kwargs):  # <--- implemented PER class
         """
         Reads a dataset in preparation for train or test. Returns data in proper format for train or test.
 
         Args:
-            fileNames: list-like. List of files representing the dataset to read. Each element is str, representing
-                filename [possibly with filepath]
+            file_dict: dictionary
+
+                 {
+                    "train": "file location",
+                    "dev" : "file location",
+                    "test" : "file location"
+                 }
+
+            dataset_name: str
+                Name of the dataset required for calling appropriate utils, converters
 
         Returns:
             data: data in arbitrary format for train or test.
