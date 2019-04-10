@@ -7,7 +7,7 @@ class NER(abc.ABC):
     def convert_ground_truth(self, data, *args, **kwargs):  # <--- implemented PER class
         """
         Converts test data into common format for evaluation [i.e. same format as predict()]
-        This added step/layer of abstraction is required due to the refactoring of read_dataset_traint()
+        This added step/layer of abstraction is required due to the refactoring of read_dataset_train()
         and read_dataset_test() back to the single method of read_dataset() along with the requirement on
         the format of the output of predict() and therefore the input format requirement of evaluate(). Since
         individuals will implement their own format of data from read_dataset(), this is the layer that
@@ -96,7 +96,7 @@ class NER(abc.ABC):
                  - mention type: str, the entity/mention type. None if not applicable.
 
                  NOTE: len(predictions) should equal len(data) AND the ordering should not change [important for
-                     evalutation. See note in evaluate() about parallel arrays.]
+                     evaluation. See note in evaluate() about parallel arrays.]
 
         Raises:
             None
@@ -106,14 +106,14 @@ class NER(abc.ABC):
         # return predictions
 
     @abc.abstractmethod
-    def evaluate(self, predictions, groundTruths, *args,
+    def evaluate(self, predictions, ground_truths, *args,
                  **kwargs):  # <--- common ACROSS ALL classes. Requirement that INPUT format uses output from predict()!
         """
         Calculates evaluation metrics on chosen benchmark dataset [Precision,Recall,F1, or others...]
 
         Args:
             predictions: [tuple,...], list of tuples [same format as output from predict]
-            groundTruths: [tuple,...], list of tuples representing ground truth.
+            ground_truths: [tuple,...], list of tuples representing ground truth.
 
         Returns:
             metrics: tuple with (p,r,f1). Each element is float.
@@ -131,7 +131,6 @@ class NER(abc.ABC):
         # return (precision, recall, f1)
 
 
-
 """
 # Sample workflow:
 file_dict = {
@@ -141,8 +140,8 @@ file_dict = {
              }
 dataset_name = 'CONLL2003'
 
-# instatiate the class
-myModel = myClass() 
+# instantiate the class
+myModel = myClass()
 
 # read in a dataset for training
 data = myModel.read_dataset(file_dict, dataset_name)  
@@ -155,5 +154,3 @@ P,R,F1 = myModel.evaluate(predictions, test_labels)  # calculate Precision, Reca
 print('Precision: %s, Recall: %s, F1: %s'%(P,R,F1))
 
 """
-
-
