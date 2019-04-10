@@ -41,9 +41,9 @@ class NER(abc.ABC):
             file_dict: dictionary
 
                  {
-                    "train": "file location",
-                    "dev" : "file location",
-                    "test" : "file location"
+                    "train": dict, {key="file description":value="file location"},
+                    "dev" : dict, {key="file description":value="file location"},
+                    "test" : dict, {key="file description":value="file location"},
                  }
 
             dataset_name: str
@@ -131,29 +131,29 @@ class NER(abc.ABC):
         # return (precision, recall, f1)
 
 
+
 """
 # Sample workflow:
+file_dict = {
+                "train": {"data" : "/home/sample_train.txt"},
+                "dev": {"data" : "/home/sample_dev.txt"},
+                "test": {"data" : "/home/sample_test.txt"},
+             }
+dataset_name = 'CONLL2003'
 
-inputFiles = ['thisDir/file1.txt','thatDir/file2.txt','./file1.txt']
+# instatiate the class
+myModel = myClass() 
 
-myModel = myClass(DITKModel_NER)  # instatiate the class
+# read in a dataset for training
+data = myModel.read_dataset(file_dict, dataset_name)  
+myModel.train(data)  # trains the model and stores model state in object properties or similar
 
-data = myModel.read_dataset(inputFiles)  # read in a dataset for training
-
-# do whatever to split your data into train/test [USER would split however they want..this is just example]
-# assumes list-like format of data
-train_data = data[:int(0.8*len(data))]
-test_data = data[int(0.8*len(data)):]
-
-myModel.train(train_data)  # trains the model and stores model state in object properties or similar
-
-predictions = myModel.predict(test_data)  # generate predictions! output format will be same for everyone
-
-test_labels = myModel.convert_ground_truth(test_data)  <-- need ground truth labels need to be in same format as predictions!
+predictions = myModel.predict(data['test'])  # generate predictions! output format will be same for everyone
+test_labels = myModel.convert_ground_truth(data['test'])  <-- need ground truth labels need to be in same format as predictions!
 
 P,R,F1 = myModel.evaluate(predictions, test_labels)  # calculate Precision, Recall, F1
-
 print('Precision: %s, Recall: %s, F1: %s'%(P,R,F1))
 
 """
+
 
