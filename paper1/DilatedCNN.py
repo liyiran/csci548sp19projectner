@@ -49,6 +49,7 @@ class DilatedCNN(NER):
         :return: the list in which each element is a list of token and tag
         :raise: if the file is not accessible or wrong format
         '''
+        
         pass
 
     @classmethod
