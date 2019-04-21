@@ -4,9 +4,9 @@ import os
 import keras
 import numpy
 from keras_wc_embd import get_batch_input, get_dicts_generator, get_embedding_weights_from_file
+from paper2.model import build_model
 
 from ner import NER
-from paper2.model import build_model
 
 
 class UOI(NER):
@@ -29,21 +29,27 @@ class UOI(NER):
         'I-MISC': 8,
     }
 
-    train_taggings = None
-    train_sentences = None
+    train_taggings = []
+    train_sentences = []
     word_embd_weights = None
     word_dict = None
     char_dict = None
     max_word_len = None
-    valid_sentences = None
-    valid_taggings = None
+    valid_sentences = []
+    valid_taggings = []
     valid_steps = None
+    model = None
+    total_pred, total_true, matched_num = 0, 0, 0.0
     '''
     The paper is for using Parallel Recurrent Neural Networks to do the NER
     '''
 
     def evaluate(self, predictions, ground_truths, *args, **kwargs):
-        pass
+        eps = 1e-6
+        precision = (self.matched_num + eps) / (self.total_pred + eps)
+        recall = (self.matched_num + eps) / (self.total_true + eps)
+        f1 = 2 * precision * recall / (precision + recall)
+        return precision, recall, f1
 
     def convert_ground_truth(self, data, *args, **kwargs):
         '''
@@ -68,7 +74,7 @@ class UOI(NER):
          '''
         pass
 
-    def read_dataset(self, fileNames, *args, **kwargs):
+    def read_dataset(self, training_files=None, validate_files=None, *args, **kwargs):
         '''
         The method is for reading the data from files.
         For example:
@@ -80,33 +86,45 @@ class UOI(NER):
         [('Peter','NNP', 'B-NP','B-PER'),('Blackburn','NNP', 'I-NP','I-PER')]
         ]
         This method will do a preprocess for the input files such as embedding the words. The preprocessed data will be stored in a file locally.
-        :param fileNames: The path of the training data, testing data or validation data
+        :param training_files: The path of the training data, testing data or validation data
         :return: the list in which each element is a list of token and tag
         :raise: if the file is not accessible or wrong format
         '''
+        if validate_files is None:
+            validate_files = ['paper2/CoNNL2003eng/valid.txt']
+        if training_files is None:
+            training_files = ['paper2/CoNNL2003eng/train.txt']
+        for path in training_files:
+            sentences, taggings = self.load_data(path)
+            self.train_sentences.extend(sentences)
+            self.train_taggings.extend(taggings)
+        for path in validate_files:
+            sentences, taggings = self.load_data(path)
+            self.valid_sentences.extend(sentences)
+            self.valid_taggings.extend(taggings)
+        return self.train_sentences, self.train_taggings, self.valid_sentences, self.valid_taggings
+
+    def load_data(self, path):
         sentences, taggings = [], []
-        for path in fileNames:
-            with codecs.open(path, 'r', 'utf8') as reader:
-                for line in reader:
-                    line = line.strip()
-                    if not line:
-                        if not sentences or len(sentences[-1]) > 0:
-                            sentences.append([])
-                            taggings.append([])
-                        continue
-                    parts = line.split()
-                    if parts[0] != '-DOCSTART-':
-                        sentences[-1].append(parts[0])
-                        taggings[-1].append(self.TAGS[parts[-1]])
-            if not sentences[-1]:
-                sentences.pop()
-                taggings.pop()
-        self.train_sentences = sentences
-        self.train_taggings = taggings
+        with codecs.open(path, 'r', 'utf8') as reader:
+            for line in reader:
+                line = line.strip()
+                if not line:
+                    if not sentences or len(sentences[-1]) > 0:
+                        sentences.append([])
+                        taggings.append([])
+                    continue
+                parts = line.split()
+                if parts[0] != '-DOCSTART-':
+                    sentences[-1].append(parts[0])
+                    taggings[-1].append(self.TAGS[parts[-1]])
+        if not sentences[-1]:
+            sentences.pop()
+            taggings.pop()
         return sentences, taggings
 
-    @classmethod
-    def train(self, data, *args, **kwargs):
+    # @classmethod
+    def train(self, data=None, *args, **kwargs):
         '''
        This method is for training the dilated cnn model. It will update the model weights. 
         For example:
@@ -127,10 +145,10 @@ class UOI(NER):
         )
         for sentence in self.train_sentences:
             dicts_generator(sentence)
-            self.word_dict, self.char_dict, self.max_word_len = dicts_generator(return_dict=True)
+        self.word_dict, self.char_dict, self.max_word_len = dicts_generator(return_dict=True)
         if os.path.exists(self.WORD_EMBD_PATH):
             print('Embedding...')
-            word_dict = {
+            self.word_dict = {
                 '': 0,
                 '<UNK>': 1,
             }
@@ -141,11 +159,11 @@ class UOI(NER):
                     if not line:
                         continue
                     word = line.split()[0].lower()
-                    if word not in word_dict:
-                        word_dict[word] = len(word_dict)
+                    if word not in self.word_dict:
+                        self.word_dict[word] = len(self.word_dict)
                 print('Embedding for loop')
             self.word_embd_weights = get_embedding_weights_from_file(
-                word_dict,
+                self.word_dict,
                 self.WORD_EMBD_PATH,
                 ignore_case=True,
             )
@@ -154,35 +172,38 @@ class UOI(NER):
             self.word_embd_weights = None
         print('Embedding all done')
         train_steps = (len(self.train_sentences) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
-        model = build_model(rnn_num=self.RNN_NUM,
-                            rnn_units=self.RNN_UNITS,
-                            word_dict_len=len(self.word_dict),
-                            char_dict_len=len(self.char_dict),
-                            max_word_len=self.max_word_len,
-                            output_dim=len(self.TAGS),
-                            word_embd_weights=self.word_embd_weights)
-        model.summary()
+        valid_steps = (len(self.valid_sentences) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
+
+        self.model = build_model(rnn_num=self.RNN_NUM,
+                                 rnn_units=self.RNN_UNITS,
+                                 word_dict_len=len(self.word_dict),
+                                 char_dict_len=len(self.char_dict),
+                                 max_word_len=self.max_word_len,
+                                 output_dim=len(self.TAGS),
+                                 word_embd_weights=self.word_embd_weights)
+        self.model.summary()
 
         if os.path.exists(self.MODEL_PATH):
-            model.load_weights(self.MODEL_PATH, by_name=True)
+            print("loading model from: ", self.MODEL_PATH)
+            self.model.load_weights(self.MODEL_PATH, by_name=True)
+        else:
+            print('Fitting...')
+            self.model.fit_generator(
+                generator=self.batch_generator(self.train_sentences, self.train_taggings, train_steps),
+                steps_per_epoch=train_steps,
+                epochs=self.EPOCHS,
+                validation_data=self.batch_generator(self.valid_sentences, self.valid_taggings, valid_steps),
+                validation_steps=valid_steps,
+                callbacks=[
+                    keras.callbacks.EarlyStopping(monitor='val_loss', patience=2),
+                    keras.callbacks.EarlyStopping(monitor='val_categorical_accuracy', patience=2),
+                ],
+                verbose=True,
+            )
 
-        print('Fitting...')
-        model.fit_generator(
-            generator=self.batch_generator(self.train_sentences, self.train_taggings, train_steps),
-            steps_per_epoch=train_steps,
-            epochs=self.EPOCHS,
-            validation_data=self.batch_generator(self.valid_sentences, self.valid_taggings, self.valid_steps),
-            validation_steps=self.valid_steps,
-            callbacks=[
-                keras.callbacks.EarlyStopping(monitor='val_loss', patience=2),
-                keras.callbacks.EarlyStopping(monitor='val_categorical_accuracy', patience=2),
-            ],
-            verbose=True,
-        )
+            self.model.save_weights(self.MODEL_PATH)
 
-        model.save_weights(self.MODEL_PATH)
-
-    @classmethod
+    # @classmethod
     def predict(self, data, *args, **kwargs):
         '''
         This method is for predicting tags for tokens. The input data is a list in which each element is a list for tokens w/o tags
@@ -207,28 +228,29 @@ class UOI(NER):
         :param data: a list in which each element is a list containing tokens w/o tags
         :return: list of tags
         '''
-        test_sentences, test_taggings = self.read_dataset(data)
+        test_sentences, test_taggings = self.load_data(data)
         test_steps = (len(test_sentences) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
-        print('Predicting...')
-        eps = 1e-6
-        total_pred, total_true, matched_num = 0, 0, 0.0
-        for inputs, batch_taggings in self.batch_generator(
-                test_sentences,
-                test_taggings,
-                test_steps,
-                training=False):
+        # eps = 1e-6
+        predicts = []
+        true_tags = []
+        # total_pred, total_true, matched_num = 0, 0, 0.0
+        for inputs, batch_taggings in self.batch_generator(test_sentences,test_taggings,test_steps,training=False):
             predict = self.model.predict_on_batch(inputs)
             predict = numpy.argmax(predict, axis=2).tolist()
             for i, pred in enumerate(predict):
+                predicts.append((list(map(lambda x: self.fromValueToKey(x), pred[:len(batch_taggings[i])]))))
+                true_tags.append((list(map(lambda x: self.fromValueToKey(x), batch_taggings[i]))))
                 pred = self.get_tags(pred[:len(batch_taggings[i])])
                 true = self.get_tags(batch_taggings[i])
-                total_pred += len(pred)
-                total_true += len(true)
-                matched_num += sum([1 for tag in pred if tag in true])
-        precision = (matched_num + eps) / (total_pred + eps)
-        recall = (matched_num + eps) / (total_true + eps)
-        f1 = 2 * precision * recall / (precision + recall)
-        print('P: %.4f  R: %.4f  F: %.4f' % (precision, recall, f1))
+                self.total_pred += len(pred)
+                self.total_true += len(true)
+                self.matched_num += sum([1 for tag in pred if tag in true])
+        return predicts, true_tags
+
+    def fromValueToKey(self, value):
+        for tag, index in self.TAGS.items():
+            if index == value:
+                return tag
 
     def batch_generator(self, sentences, taggings, steps, training=True):
         while True:
@@ -261,7 +283,7 @@ class UOI(NER):
         y4d = y1d.reshape([batch_size, n_rows, n_cls])
         return y4d
 
-    def get_tags(tags):
+    def get_tags(self, tags):
         filtered = []
         for i in range(len(tags)):
             if tags[i] == 0:
@@ -275,3 +297,4 @@ class UOI(NER):
             elif i > 0 and tags[i - 1] == tags[i] - 1:
                 filtered[-1]['end'] += 1
         return filtered
+
